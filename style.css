@@ -1,0 +1,15 @@
+body {
+  margin: 0;
+  background: linear-gradient(to bottom, #004466, #001122);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  color: white;
+}
+
+canvas {
+  background: transparent;
+}
