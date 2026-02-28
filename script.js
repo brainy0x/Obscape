@@ -17,6 +17,7 @@ let player = {
 // --- Game objects ---
 let obstacles = [];
 let bubbles = [];
+let particles = [];
 let score = 0;
 let speed = 2;
 let inkActive = false;
@@ -24,18 +25,28 @@ let gameOver = false;
 let gameStarted = false;
 
 // --- Audio ---
-const audioCurrent = new Audio('audio/current.mp3'); // ambient water
+const audioCurrent = new Audio('audio/current.mp3');
 audioCurrent.loop = true;
 audioCurrent.volume = 0.3;
 
-const audioFail = new Audio('audio/fail.mp3'); // fail collision
+const audioFail = new Audio('audio/fail.mp3');
 audioFail.volume = 0.6;
 
-const audioInk = new Audio('audio/ink.mp3'); // ink ability
+const audioInk = new Audio('audio/ink.mp3');
 audioInk.volume = 0.4;
 
-const audioBubble = new Audio('audio/bubble.mp3'); // bubble pop
+const audioBubble = new Audio('audio/bubble.mp3');
 audioBubble.volume = 0.2;
+
+// --- Background particles ---
+for(let i=0;i<40;i++){
+  particles.push({
+    x: Math.random()*canvas.width,
+    y: Math.random()*canvas.height,
+    size: Math.random()*2+1,
+    speed: Math.random()*0.5+0.2
+  });
+}
 
 // --- Flavor text ---
 function getFlavorText(score){
@@ -53,11 +64,10 @@ document.addEventListener("keydown", e => {
 
   if(e.key === " ") {
     if(!gameStarted){
-      // Start the game on first SPACE
       gameStarted = true;
-      audioCurrent.play().catch(err => console.log("User gesture required for audio."));
-    } else if(!inkActive){
-      // Ink ability only after game started
+      audioCurrent.play().catch(()=>{});
+    } 
+    else if(!inkActive && !gameOver){
       inkActive = true;
       audioInk.currentTime = 0;
       audioInk.play();
@@ -72,7 +82,7 @@ document.addEventListener("keyup", e => keys[e.key] = false);
 function spawnObstacle(){
   const width = 30 + Math.random()*20;
   const x = Math.random()*(canvas.width - width);
-  const type = Math.random()<0.2?"#ff5555":"#888888"; // jellyfish or rock
+  const type = Math.random()<0.2?"#ff5555":"#888888";
   obstacles.push({x: x, y: -30, width: width, height: 20, color: type});
 }
 
@@ -92,7 +102,13 @@ function addBubble(){
 
 // --- Update game ---
 function update(){
-  if(!gameStarted) return; // freeze until start
+  if(!gameStarted || gameOver) return;
+
+  // Move background particles
+  particles.forEach(p=>{
+    p.y -= p.speed;
+    if(p.y < 0) p.y = canvas.height;
+  });
 
   // Player move
   if(keys["ArrowLeft"] && player.x>0) player.x -= 4;
@@ -100,61 +116,69 @@ function update(){
   if(keys["ArrowUp"] && player.y>0) player.y -=4;
   if(keys["ArrowDown"] && player.y + player.size < canvas.height) player.y +=4;
 
-  // Add bubble
   addBubble();
 
-  // Move bubbles
   bubbles.forEach(b => {
     b.y -= 1;
     b.alpha -= 0.02;
   });
   bubbles = bubbles.filter(b => b.alpha>0);
 
-  // Spawn obstacles
   if(Math.random()<0.03) spawnObstacle();
 
-  // Move obstacles
   obstacles.forEach(o => o.y += speed);
 
-  // Collision check
   obstacles.forEach(o=>{
-    if(!gameOver &&
-       o.x < player.x + player.size && o.x + o.width > player.x &&
+    if(o.x < player.x + player.size && o.x + o.width > player.x &&
        o.y < player.y + player.size && o.y + o.height > player.y){
 
-      gameOver = true;      // prevent multiple triggers
+      gameOver = true;
+      audioCurrent.pause();
       audioFail.currentTime = 0;
       audioFail.play();
 
       setTimeout(() => {
         alert("Game Over! Score: " + Math.floor(score));
 
-        // Reset game
+        // Reset everything properly
         score = 0;
-        obstacles = [];
         speed = 2;
+        obstacles = [];
+        bubbles = [];
         player.x = canvas.width/2 - tileSize/2;
         player.y = canvas.height - 80;
-
+        gameStarted = false;
         gameOver = false;
-      }, 100);
+      }, 200);
     }
   });
 
-  // Remove offscreen obstacles
   obstacles = obstacles.filter(o => o.y < canvas.height + 50);
 
-  // Increase score & speed
   score += 0.1;
-  if(score%10<0.1) speed = 2 + score*0.02;
+  speed = 2 + score*0.02;
 }
 
 // --- Draw ---
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
+  // 🌊 Ocean gradient
+  const gradient = ctx.createLinearGradient(0,0,0,canvas.height);
+  gradient.addColorStop(0,"#005f8f");
+  gradient.addColorStop(1,"#001a26");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // ✨ Soft glow particles
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  particles.forEach(p=>{
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+    ctx.fill();
+  });
+
   if(!gameStarted){
-    // Start screen
     ctx.fillStyle = "white";
     ctx.font = "24px Arial";
     ctx.textAlign = "center";
@@ -183,18 +207,15 @@ function draw(){
     ctx.fillRect(o.x,o.y,o.width,o.height);
   });
 
-  // Ink overlay
   if(inkActive){
     ctx.fillStyle = "rgba(0,0,0,0.3)";
     ctx.fillRect(0,0,canvas.width,canvas.height);
   }
 
-  // Score
   ctx.fillStyle = "white";
   ctx.font = "20px Arial";
   ctx.fillText("Score: "+Math.floor(score),10,25);
 
-  // Flavor text
   ctx.font = "16px Arial";
   ctx.fillText(getFlavorText(score),10,50);
 }
