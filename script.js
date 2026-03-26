@@ -1,3 +1,4 @@
+// ===== Canvas =====
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -57,26 +58,47 @@ function getFlavorText(score){
   return "Survive the depths!";
 }
 
-// --- Player movement ---
+// ===== INPUT =====
 let keys = {};
+
+// Keyboard
 document.addEventListener("keydown", e => {
   keys[e.key] = true;
 
   if(e.key === " ") {
-    if(!gameStarted){
-      gameStarted = true;
-      audioCurrent.play().catch(()=>{});
-    } 
-    else if(!inkActive && !gameOver){
-      inkActive = true;
-      audioInk.currentTime = 0;
-      audioInk.play();
-      setTimeout(()=>inkActive=false, 2000);
-    }
+    handleAction();
   }
 });
 
 document.addEventListener("keyup", e => keys[e.key] = false);
+
+// Touch: drag to move
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+
+  player.x = touch.clientX - rect.left - player.size/2;
+  player.y = touch.clientY - rect.top - player.size/2;
+});
+
+// Touch: tap = start or ink
+canvas.addEventListener("touchstart", e => {
+  handleAction();
+});
+
+// Unified action handler
+function handleAction(){
+  if(!gameStarted){
+    gameStarted = true;
+    audioCurrent.play().catch(()=>{});
+  } else if(!inkActive && !gameOver){
+    inkActive = true;
+    audioInk.currentTime = 0;
+    audioInk.play();
+    setTimeout(()=>inkActive=false, 2000);
+  }
+}
 
 // --- Obstacles ---
 function spawnObstacle(){
@@ -100,21 +122,25 @@ function addBubble(){
   audioBubble.play();
 }
 
-// --- Update game ---
+// --- Update ---
 function update(){
   if(!gameStarted || gameOver) return;
 
-  // Move background particles
+  // Background particles
   particles.forEach(p=>{
     p.y -= p.speed;
     if(p.y < 0) p.y = canvas.height;
   });
 
-  // Player move
+  // Keyboard movement
   if(keys["ArrowLeft"] && player.x>0) player.x -= 4;
   if(keys["ArrowRight"] && player.x + player.size < canvas.width) player.x +=4;
   if(keys["ArrowUp"] && player.y>0) player.y -=4;
   if(keys["ArrowDown"] && player.y + player.size < canvas.height) player.y +=4;
+
+  // Clamp player
+  player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+  player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
 
   addBubble();
 
@@ -140,7 +166,6 @@ function update(){
       setTimeout(() => {
         alert("Game Over! Score: " + Math.floor(score));
 
-        // Reset everything properly
         score = 0;
         speed = 2;
         obstacles = [];
@@ -163,14 +188,14 @@ function update(){
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // 🌊 Ocean gradient
+  // Ocean gradient
   const gradient = ctx.createLinearGradient(0,0,0,canvas.height);
   gradient.addColorStop(0,"#005f8f");
   gradient.addColorStop(1,"#001a26");
   ctx.fillStyle = gradient;
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // ✨ Soft glow particles
+  // Glow particles
   ctx.fillStyle = "rgba(255,255,255,0.05)";
   particles.forEach(p=>{
     ctx.beginPath();
@@ -182,12 +207,12 @@ function draw(){
     ctx.fillStyle = "white";
     ctx.font = "24px Arial";
     ctx.textAlign = "center";
-    ctx.fillText("Press SPACE to Start", canvas.width/2, canvas.height/2);
+    ctx.fillText("Tap or Press SPACE to Start", canvas.width/2, canvas.height/2);
     ctx.textAlign = "left";
     return;
   }
 
-  // Draw bubbles
+  // Bubbles
   bubbles.forEach(b=>{
     ctx.globalAlpha = b.alpha;
     ctx.fillStyle = "#88ccff";
@@ -197,11 +222,11 @@ function draw(){
     ctx.globalAlpha = 1;
   });
 
-  // Draw player
+  // Player
   ctx.fillStyle = player.color;
   ctx.fillRect(player.x,player.y,player.size,player.size);
 
-  // Draw obstacles
+  // Obstacles
   obstacles.forEach(o=>{
     ctx.fillStyle = o.color;
     ctx.fillRect(o.x,o.y,o.width,o.height);
@@ -220,7 +245,7 @@ function draw(){
   ctx.fillText(getFlavorText(score),10,50);
 }
 
-// --- Game loop ---
+// --- Loop ---
 function gameLoop(){
   update();
   draw();
